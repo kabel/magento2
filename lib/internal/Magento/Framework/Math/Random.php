@@ -28,15 +28,16 @@ class Random
      *
      * @param int         $length
      * @param null|string $chars
+     * @param $strong [optional] Should the source of randomness be cryptographically strong
      * @return string
      */
-    public function getRandomString($length, $chars = null)
+    public function getRandomString($length, $chars = null, $strong = false)
     {
         if (null === $chars) {
             $chars = self::CHARS_LOWERS . self::CHARS_UPPERS . self::CHARS_DIGITS;
         }
 
-        return Rand::getString($length, $chars);
+        return Rand::getString($length, $chars, $strong);
     }
 
     /**
@@ -44,15 +45,16 @@ class Random
      *
      * @param $min [optional]
      * @param $max [optional]
+     * @param $strong [optional] Should the source of randomness be cryptographically strong
      * @return int A random integer value between min (or 0) and max
      */
-    public static function getRandomNumber($min = 0, $max = null)
+    public static function getRandomNumber($min = 0, $max = null, $strong = false)
     {
         if (null === $max) {
             $max = PHP_INT_MAX;
         }
 
-        return Rand::getInteger($min, $max);
+        return Rand::getInteger($min, $max, $strong);
     }
 
     /**
