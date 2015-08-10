@@ -33,7 +33,9 @@ class Encryptor implements EncryptorInterface
 
     const CIPHER_RIJNDAEL_256 = 2;
 
-    const CIPHER_LATEST = 2;
+    const CIPHER_AES_256 = 3;
+
+    const CIPHER_LATEST = 3;
     /**#@-*/
 
     /**
@@ -92,7 +94,7 @@ class Encryptor implements EncryptorInterface
      */
     public function validateCipher($version)
     {
-        $types = [self::CIPHER_BLOWFISH, self::CIPHER_RIJNDAEL_128, self::CIPHER_RIJNDAEL_256];
+        $types = [self::CIPHER_BLOWFISH, self::CIPHER_RIJNDAEL_128, self::CIPHER_RIJNDAEL_256, self::CIPHER_AES_256];
 
         $version = (int)$version;
         if (!in_array($version, $types, true)) {
@@ -195,7 +197,7 @@ class Encryptor implements EncryptorInterface
         if (null === $crypt) {
             return $data;
         }
-        return $this->keyVersion . ':' . $this->cipher . ':' . (MCRYPT_MODE_CBC ===
+        return $this->keyVersion . ':' . $this->cipher . ':' . (Crypt::MODE_ECB !==
         $crypt->getMode() ? $crypt->getInitVector() . ':' : '') . base64_encode(
             $crypt->encrypt((string)$data)
         );
@@ -223,7 +225,7 @@ class Encryptor implements EncryptorInterface
                 list($keyVersion, $cryptVersion, $iv, $data) = $parts;
                 $initVector = $iv ? $iv : false;
                 $keyVersion = (int)$keyVersion;
-                $cryptVersion = self::CIPHER_RIJNDAEL_256;
+                $cryptVersion = (int)$cryptVersion;
                 // specified key, specified crypt
             } elseif (3 === $partsCount) {
                 list($keyVersion, $cryptVersion, $data) = $parts;
@@ -306,10 +308,6 @@ class Encryptor implements EncryptorInterface
      */
     protected function getCrypt($key = null, $cipherVersion = null, $initVector = true)
     {
-        if (null === $key && null === $cipherVersion) {
-            $cipherVersion = self::CIPHER_RIJNDAEL_256;
-        }
-
         if (null === $key) {
             $key = $this->keys[$this->keyVersion];
         }
@@ -323,15 +321,22 @@ class Encryptor implements EncryptorInterface
         }
         $cipherVersion = $this->validateCipher($cipherVersion);
 
-        if ($cipherVersion === self::CIPHER_RIJNDAEL_128) {
-            $cipher = MCRYPT_RIJNDAEL_128;
-            $mode = MCRYPT_MODE_ECB;
-        } elseif ($cipherVersion === self::CIPHER_RIJNDAEL_256) {
-            $cipher = MCRYPT_RIJNDAEL_256;
-            $mode = MCRYPT_MODE_CBC;
-        } else {
-            $cipher = MCRYPT_BLOWFISH;
-            $mode = MCRYPT_MODE_ECB;
+        switch ($cipherVersion) {
+            case self::CIPHER_RIJNDAEL_128:
+                $cipher = Crypt::CIPHER_RIJNDAEL_128;
+                $mode = Crypt::MODE_ECB;
+                break;
+            case self::CIPHER_RIJNDAEL_256:
+                $cipher = Crypt::CIPHER_RIJNDAEL_256;
+                $mode = Crypt::MODE_CBC;
+                break;
+            case self::CIPHER_AES_256:
+                $cipher = Crypt::CIPHER_RIJNDAEL_128;
+                $mode = Crypt::MODE_CTR;
+                break;
+            default:
+                $cipher = Crypt::CIPHER_BLOWFISH;
+                $mode = Crypt::MODE_ECB;
         }
 
         return new Crypt($key, $cipher, $mode, $initVector);
