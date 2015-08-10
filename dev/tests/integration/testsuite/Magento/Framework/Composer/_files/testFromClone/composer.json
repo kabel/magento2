@@ -50,7 +50,7 @@
         "ext-spl": "*",
         "ext-dom": "*",
         "ext-simplexml": "*",
-        "ext-mcrypt": "*",
+        "ext-openssl": "*",
         "ext-hash": "*",
         "ext-curl": "*",
         "ext-iconv": "*",

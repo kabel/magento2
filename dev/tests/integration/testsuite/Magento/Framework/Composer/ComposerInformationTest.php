@@ -83,7 +83,7 @@ class ComposerInformationTest extends \PHPUnit_Framework_TestCase
     {
         $this->setupDirectoryMock($composerDir);
         $composerInfo = new ComposerInformation($this->filesystemMock, $this->bufferIoFactoryMock);
-        $expectedExtensions = ['ctype', 'gd', 'spl', 'dom', 'simplexml', 'mcrypt', 'hash', 'curl', 'iconv', 'intl'];
+        $expectedExtensions = ['ctype', 'gd', 'spl', 'dom', 'simplexml', 'openssl', 'hash', 'curl', 'iconv', 'intl'];
 
         $actualRequiredExtensions = $composerInfo->getRequiredExtensions();
         foreach ($expectedExtensions as $expectedExtension) {
