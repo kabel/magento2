@@ -8,7 +8,7 @@
   'blowfish' => [
     'ecb' => [
       'key_size' => 56,
-      'iv_size' => 8,
+      'iv_size' => 0,
     ],
     'cbc' => [
       'key_size' => 56,
@@ -22,7 +22,7 @@
       'key_size' => 56,
       'iv_size' => 8,
     ],
-    'nofb' => [
+    'ctr' => [
       'key_size' => 56,
       'iv_size' => 8,
     ],
@@ -30,7 +30,7 @@
   'rijndael-128' => [
     'ecb' => [
       'key_size' => 32,
-      'iv_size' => 16,
+      'iv_size' => 0,
     ],
     'cbc' => [
       'key_size' => 32,
@@ -44,7 +44,7 @@
       'key_size' => 32,
       'iv_size' => 16,
     ],
-    'nofb' => [
+    'ctr' => [
       'key_size' => 32,
       'iv_size' => 16,
     ],
@@ -52,7 +52,7 @@
   'rijndael-256' => [
     'ecb' => [
       'key_size' => 32,
-      'iv_size' => 32,
+      'iv_size' => 0,
     ],
     'cbc' => [
       'key_size' => 32,
@@ -66,7 +66,7 @@
       'key_size' => 32,
       'iv_size' => 32,
     ],
-    'nofb' => [
+    'ctr' => [
       'key_size' => 32,
       'iv_size' => 32,
     ],

@@ -150,8 +150,8 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
         $parts = explode(':', $actual, 4);
         list(, , $iv, $encryptedData) = $parts;
 
-        // Decrypt returned data with RIJNDAEL_256 cipher, cbc mode
-        $crypt = new Crypt('cryptKey', MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC, $iv);
+        // Decrypt returned data with latest cipher and mode (must match latest cipher)
+        $crypt = new Crypt('cryptKey', Crypt::CIPHER_RIJNDAEL_128, Crypt::MODE_CTR, $iv);
         // Verify decrypted matches original data
         $this->assertEquals($data, $crypt->decrypt(base64_decode((string)$encryptedData)));
     }
@@ -163,15 +163,10 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
             '7ZPIIRZzQrgQH+csfF3fyxYNwbzPTwegncnoTxvI3OZyqKGYlOCTSx5i1KRqNemCC8kuCiOAttLpAymXhzjhNQ==';
 
         $actual = $this->_model->decrypt($data);
+        $expected = 'Mares eat oats and does eat oats, but little lambs eat ivy.';
+        $this->assertEquals($expected, $actual);
 
-        // Extract the initialization vector and encrypted data
-        $parts = explode(':', $data, 4);
-        list(, , $iv, $encrypted) = $parts;
-
-        // Decrypt returned data with RIJNDAEL_256 cipher, cbc mode
-        $crypt = new Crypt('cryptKey', MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC, $iv);
-        // Verify decrypted matches original data
-        $this->assertEquals($encrypted, base64_encode($crypt->encrypt($actual)));
+        // not testing for same encrypted values as the encryption padding algorithm may have changed
     }
 
     public function testEncryptDecryptNewKeyAdded()
@@ -201,7 +196,7 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
     public function testValidateKey()
     {
         $actual = $this->_model->validateKey('some_key');
-        $crypt = new Crypt('some_key', MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC, $actual->getInitVector());
+        $crypt = new Crypt('some_key', Crypt::CIPHER_RIJNDAEL_128, Crypt::MODE_CTR, $actual->getInitVector());
         $expectedEncryptedData = base64_encode($crypt->encrypt('data'));
         $actualEncryptedData = base64_encode($actual->encrypt('data'));
         $this->assertEquals($expectedEncryptedData, $actualEncryptedData);

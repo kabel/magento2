@@ -3,11 +3,9 @@
  * Copyright © 2015 Magento. All rights reserved.
  * See COPYING.txt for license details.
  */
-
-/**
- * Test case for \Magento\Framework\Encryption\Crypt
- */
 namespace Magento\Framework\Encryption\Test\Unit;
+
+use \Magento\Framework\Encryption\Crypt;
 
 class CryptTest extends \PHPUnit_Framework_TestCase
 {
@@ -15,14 +13,18 @@ class CryptTest extends \PHPUnit_Framework_TestCase
 
     private static $_cipherInfo;
 
-    protected $_supportedCiphers = [MCRYPT_BLOWFISH, MCRYPT_RIJNDAEL_128, MCRYPT_RIJNDAEL_256];
+    protected $_supportedCiphers = [
+        Crypt::CIPHER_BLOWFISH,
+        Crypt::CIPHER_RIJNDAEL_128,
+        Crypt::CIPHER_RIJNDAEL_256,
+    ];
 
     protected $_supportedModes = [
-        MCRYPT_MODE_ECB,
-        MCRYPT_MODE_CBC,
-        MCRYPT_MODE_CFB,
-        MCRYPT_MODE_OFB,
-        MCRYPT_MODE_NOFB,
+        Crypt::MODE_ECB,
+        Crypt::MODE_CBC,
+        Crypt::MODE_CFB,
+        Crypt::MODE_OFB,
+        Crypt::MODE_CTR,
     ];
 
     protected function setUp()
@@ -33,6 +35,9 @@ class CryptTest extends \PHPUnit_Framework_TestCase
     protected function _getRandomString($length)
     {
         $result = '';
+        if (!$length) {
+            return $result;
+        }
         do {
             $result .= sha1(microtime());
         } while (strlen($result) < $length);
@@ -43,22 +48,40 @@ class CryptTest extends \PHPUnit_Framework_TestCase
     {
         $filename = __DIR__ . '/Crypt/_files/_cipher_info.php';
         /* Generate allowed sizes for encryption key and init vector
-           $data = array();
-           foreach ($this->_supportedCiphers as $cipher) {
-           if (!array_key_exists($cipher, $data)) {
-           $data[$cipher] = array();
-           }
-           foreach ($this->_supportedModes as $mode) {
-           $cipherHandle = mcrypt_module_open($cipher, '', $mode, '');
-           $data[$cipher][$mode] = array(
-           'key_size' => mcrypt_enc_get_key_size($cipherHandle),
-           'iv_size'  => mcrypt_enc_get_iv_size($cipherHandle),
-           );
-           mcrypt_module_close($cipherHandle);
-           }
-           }
-           file_put_contents($filename, '<?php return ' . var_export($data, true) . ";\n", LOCK_EX);
-           */
+        $data = [];
+
+        foreach ($this->_supportedCiphers as $cipher) {
+            if (!array_key_exists($cipher, $data)) {
+                $data[$cipher] = [];
+            }
+
+            $key_size = 0;
+            $iv_size = 0;
+
+            switch ($cipher) {
+                case Crypt::CIPHER_BLOWFISH:
+                    $key_size = 56;
+                    $iv_size = 8;
+                    break;
+                case Crypt::CIPHER_RIJNDAEL_128:
+                    $key_size = 32;
+                    $iv_size = 16;
+                    break;
+                case Crypt::CIPHER_RIJNDAEL_256:
+                    $key_size = 32;
+                    $iv_size = 32;
+            }
+
+            foreach ($this->_supportedModes as $mode) {
+                $data[$cipher][$mode] = [
+                    'key_size' => $key_size,
+                    'iv_size'  => ($mode == Crypt::MODE_ECB) ? 0 : $iv_size,
+                ];
+            }
+        }
+
+        file_put_contents($filename, '<?php return ' . var_export($data, true) . ";\n", LOCK_EX);
+        */
         if (!self::$_cipherInfo) {
             self::$_cipherInfo = include $filename;
         }
@@ -94,8 +117,9 @@ class CryptTest extends \PHPUnit_Framework_TestCase
     {
         /* Generate random init vector */
         $initVector = $this->_getRandomString($this->_getInitVectorSize($cipher, $mode));
+        $key = substr($this->_key, 0, $this->_getKeySize($cipher, $mode));
 
-        $crypt = new \Magento\Framework\Encryption\Crypt($this->_key, $cipher, $mode, $initVector);
+        $crypt = new Crypt($key, $cipher, $mode, $initVector);
 
         $this->assertEquals($cipher, $crypt->getCipher());
         $this->assertEquals($mode, $crypt->getMode());
@@ -107,12 +131,16 @@ class CryptTest extends \PHPUnit_Framework_TestCase
         $result = [];
         foreach ($this->_supportedCiphers as $cipher) {
             foreach ($this->_supportedModes as $mode) {
+                $iv_size = $this->_getInitVectorSize($cipher, $mode);
                 $tooLongKey = str_repeat('-', $this->_getKeySize($cipher, $mode) + 1);
-                $tooShortInitVector = str_repeat('-', $this->_getInitVectorSize($cipher, $mode) - 1);
-                $tooLongInitVector = str_repeat('-', $this->_getInitVectorSize($cipher, $mode) + 1);
+                $tooLongInitVector = str_repeat('-', $iv_size + 1);
                 $result[] = [$tooLongKey, $cipher, $mode, false];
-                $result[] = [$this->_key, $cipher, $mode, $tooShortInitVector];
                 $result[] = [$this->_key, $cipher, $mode, $tooLongInitVector];
+
+                if ($iv_size) {
+                    $tooShortInitVector = str_repeat('-', $iv_size - 1);
+                    $result[] = [$this->_key, $cipher, $mode, $tooShortInitVector];
+                }
             }
         }
         return $result;
@@ -124,13 +152,13 @@ class CryptTest extends \PHPUnit_Framework_TestCase
      */
     public function testConstructorException($key, $cipher, $mode, $initVector)
     {
-        new \Magento\Framework\Encryption\Crypt($key, $cipher, $mode, $initVector);
+        new Crypt($key, $cipher, $mode, $initVector);
     }
 
     public function testConstructorDefaults()
     {
-        $cryptExpected = new \Magento\Framework\Encryption\Crypt($this->_key, MCRYPT_BLOWFISH, MCRYPT_MODE_ECB, false);
-        $cryptActual = new \Magento\Framework\Encryption\Crypt($this->_key);
+        $cryptExpected = new Crypt($this->_key, Crypt::CIPHER_BLOWFISH, Crypt::MODE_ECB, false);
+        $cryptActual = new Crypt($this->_key);
 
         $this->assertEquals($cryptExpected->getCipher(), $cryptActual->getCipher());
         $this->assertEquals($cryptExpected->getMode(), $cryptActual->getMode());
@@ -141,26 +169,27 @@ class CryptTest extends \PHPUnit_Framework_TestCase
     {
         $fixturesFilename = __DIR__ . '/Crypt/_files/_crypt_fixtures.php';
         /* Generate fixtures
-           $fixtures = array();
-           foreach (array('', 'Hello world!!!') as $inputString) {
-           foreach ($this->_supportedCiphers as $cipher) {
-           foreach ($this->_supportedModes as $mode) {
-           $randomKey = $this->_getRandomString($this->_getKeySize($cipher, $mode));
-           $randomInitVector = $this->_getRandomString($this->_getInitVectorSize($cipher, $mode));
-           $crypt = new \Magento\Framework\Encryption\Crypt($randomKey, $cipher, $mode, $randomInitVector);
-           $fixtures[] = array(
-           $randomKey, // Encryption key
-           $cipher,
-           $mode,
-           $randomInitVector, // Init vector
-           $inputString, // String to encrypt
-           base64_encode($crypt->encrypt($inputString)) // Store result of encryption as base64
-           );
-           }
-           }
-           }
-           file_put_contents($fixturesFilename, '<?php return ' . var_export($fixtures, true) . ";\n", LOCK_EX);
-           */
+        $fixtures = [];
+        foreach (['', 'Hello world!!!'] as $inputString) {
+            foreach ($this->_supportedCiphers as $cipher) {
+                foreach ($this->_supportedModes as $mode) {
+                    $randomKey = $this->_getRandomString($this->_getKeySize($cipher, $mode));
+                    $randomInitVector = $this->_getRandomString($this->_getInitVectorSize($cipher, $mode));
+                    $crypt = new Crypt($randomKey, $cipher, $mode, $randomInitVector);
+                    $fixtures[] = [
+                        $randomKey, // Encryption key
+                        $cipher,
+                        $mode,
+                        $randomInitVector, // Init vector
+                        $inputString, // String to encrypt
+                        base64_encode($crypt->encrypt($inputString)) // Store result of encryption as base64
+                    ];
+                }
+            }
+        }
+
+        file_put_contents($fixturesFilename, '<?php return ' . var_export($fixtures, true) . ";\n", LOCK_EX);
+        */
         $result = include $fixturesFilename;
         /* Restore encoded string back to binary */
         foreach ($result as &$cryptParams) {
@@ -175,7 +204,7 @@ class CryptTest extends \PHPUnit_Framework_TestCase
      */
     public function testEncrypt($key, $cipher, $mode, $initVector, $inputData, $expectedData)
     {
-        $crypt = new \Magento\Framework\Encryption\Crypt($key, $cipher, $mode, $initVector);
+        $crypt = new Crypt($key, $cipher, $mode, $initVector);
         $actualData = $crypt->encrypt($inputData);
         $this->assertEquals($expectedData, $actualData);
     }
@@ -185,7 +214,7 @@ class CryptTest extends \PHPUnit_Framework_TestCase
      */
     public function testDecrypt($key, $cipher, $mode, $initVector, $expectedData, $inputData)
     {
-        $crypt = new \Magento\Framework\Encryption\Crypt($key, $cipher, $mode, $initVector);
+        $crypt = new Crypt($key, $cipher, $mode, $initVector);
         $actualData = $crypt->decrypt($inputData);
         $this->assertEquals($expectedData, $actualData);
     }
@@ -195,16 +224,21 @@ class CryptTest extends \PHPUnit_Framework_TestCase
      */
     public function testInitVectorRandom($cipher, $mode)
     {
-        $crypt1 = new \Magento\Framework\Encryption\Crypt($this->_key, $cipher, $mode, true);
+        $key = substr($this->_key, 0, $this->_getKeySize($cipher, $mode));
+
+        $crypt1 = new Crypt($key, $cipher, $mode, true);
         $initVector1 = $crypt1->getInitVector();
 
-        $crypt2 = new \Magento\Framework\Encryption\Crypt($this->_key, $cipher, $mode, true);
+        $crypt2 = new Crypt($key, $cipher, $mode, true);
         $initVector2 = $crypt2->getInitVector();
 
         $expectedSize = $this->_getInitVectorSize($cipher, $mode);
         $this->assertEquals($expectedSize, strlen($initVector1));
         $this->assertEquals($expectedSize, strlen($initVector2));
-        $this->assertNotEquals($initVector2, $initVector1);
+
+        if ($expectedSize) {
+            $this->assertNotEquals($initVector2, $initVector1);
+        }
     }
 
     /**
@@ -212,7 +246,9 @@ class CryptTest extends \PHPUnit_Framework_TestCase
      */
     public function testInitVectorNone($cipher, $mode)
     {
-        $crypt = new \Magento\Framework\Encryption\Crypt($this->_key, $cipher, $mode, false);
+        $key = substr($this->_key, 0, $this->_getKeySize($cipher, $mode));
+
+        $crypt = new Crypt($key, $cipher, $mode, false);
         $actualInitVector = $crypt->getInitVector();
 
         $expectedInitVector = str_repeat("\0", $this->_getInitVectorSize($cipher, $mode));
