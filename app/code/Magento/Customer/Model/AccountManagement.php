@@ -469,7 +469,7 @@ class AccountManagement implements AccountManagementInterface
         if ($password !== null) {
             $this->checkPasswordStrength($password);
         } else {
-            $password = $this->mathRandom->getRandomString(self::MIN_PASSWORD_LENGTH);
+            $password = $this->mathRandom->getRandomString(self::MIN_PASSWORD_LENGTH, null, true);
         }
         $hash = $this->createPasswordHash($password);
         return $this->createAccountWithPasswordHash($customer, $hash, $redirectUrl);
@@ -1098,6 +1098,6 @@ class AccountManagement implements AccountManagementInterface
      */
     public function getPasswordHash($password)
     {
-        return $this->encryptor->getHash($password);
+        return $this->createPasswordHash($password);
     }
 }

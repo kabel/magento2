@@ -205,7 +205,7 @@ class Session extends \Magento\Framework\Model\AbstractModel
             $this->setWebsiteId($this->_storeManager->getStore()->getWebsiteId());
             // Setting cookie key
             do {
-                $this->setKey($this->mathRandom->getRandomString(self::KEY_LENGTH));
+                $this->setKey($this->mathRandom->getRandomString(self::KEY_LENGTH, null, true));
             } while (!$this->getResource()->isKeyAllowed($this->getKey()));
         }
 

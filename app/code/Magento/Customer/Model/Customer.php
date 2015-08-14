@@ -568,7 +568,15 @@ class Customer extends \Magento\Framework\Model\AbstractModel
         if (!$hash) {
             return false;
         }
-        return $this->_encryptor->validateHash($password, $hash);
+
+        $isValid = $this->_encryptor->validateHash($password, $hash);
+        if ($isValid && $this->_encryptor->needsRehash($hash)) {
+            $this->setPassword($password);
+            $this->save();
+            $this->load($this->getId());
+        }
+
+        return $isValid;
     }
 
     /**

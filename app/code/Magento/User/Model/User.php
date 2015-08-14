@@ -469,6 +469,12 @@ class User extends AbstractModel implements StorageInterface, UserInterface
     {
         $result = false;
         if ($this->_encryptor->validateHash($password, $this->getPassword())) {
+            if ($this->_encryptor->needsRehash($this->getPassword())) {
+                $this->setPassword($password);
+                $this->save();
+                $this->load($this->getId());
+            }
+
             if ($this->getIsActive() != '1') {
                 throw new AuthenticationException(__('This account is inactive.'));
             }

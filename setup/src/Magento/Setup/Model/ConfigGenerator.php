@@ -96,7 +96,7 @@ class ConfigGenerator
             if ($currentKey === null) {
                 $configData->set(
                     ConfigOptionsListConstants::CONFIG_PATH_CRYPT_KEY,
-                    md5($this->random->getRandomString(10))
+                    $this->random->getRandomString(32, null, true)
                 );
             }
         }

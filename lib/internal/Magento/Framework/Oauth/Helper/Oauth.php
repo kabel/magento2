@@ -64,7 +64,8 @@ class Oauth
     {
         return $this->_mathRandom->getRandomString(
             $length,
-            \Magento\Framework\Math\Random::CHARS_DIGITS . \Magento\Framework\Math\Random::CHARS_LOWERS
+            \Magento\Framework\Math\Random::CHARS_DIGITS . \Magento\Framework\Math\Random::CHARS_LOWERS,
+            true
         );
     }
 
