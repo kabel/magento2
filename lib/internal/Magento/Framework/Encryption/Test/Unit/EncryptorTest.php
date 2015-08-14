@@ -191,6 +191,8 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
         $decryptedData = $model2->decrypt($encryptedData);
 
         $this->assertSame($data, $decryptedData, 'Encryptor failed to decrypt data encrypted by old keys.');
+        $this->assertFalse($model1->needsReencrypt($encryptedData), 'Existing key should not need re-encryption.');
+        $this->assertTrue($model2->needsReencrypt($encryptedData), 'New key should mean re-encryption needed.');
     }
 
     public function testValidateKey()

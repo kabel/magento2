@@ -60,6 +60,13 @@ interface EncryptorInterface
     public function decrypt($data);
 
     /**
+     * Returns encrypted message needs to be re-encrypted
+     *
+     * @return bool
+     */
+    public function needsReencrypt($data);
+
+    /**
      * Return crypt model, instantiate if it is empty
      *
      * @param string $key

@@ -215,46 +215,74 @@ class Encryptor implements EncryptorInterface
      */
     public function decrypt($data)
     {
-        if ($data) {
-            $parts = explode(':', $data, 4);
-            $partsCount = count($parts);
-
-            $initVector = false;
-            // specified key, specified crypt, specified iv
-            if (4 === $partsCount) {
-                list($keyVersion, $cryptVersion, $iv, $data) = $parts;
-                $initVector = $iv ? $iv : false;
-                $keyVersion = (int)$keyVersion;
-                $cryptVersion = (int)$cryptVersion;
-                // specified key, specified crypt
-            } elseif (3 === $partsCount) {
-                list($keyVersion, $cryptVersion, $data) = $parts;
-                $keyVersion = (int)$keyVersion;
-                $cryptVersion = (int)$cryptVersion;
-                // no key version = oldest key, specified crypt
-            } elseif (2 === $partsCount) {
-                list($cryptVersion, $data) = $parts;
-                $keyVersion = 0;
-                $cryptVersion = (int)$cryptVersion;
-                // no key version = oldest key, no crypt version = oldest crypt
-            } elseif (1 === $partsCount) {
-                $keyVersion = 0;
-                $cryptVersion = self::CIPHER_BLOWFISH;
-                // not supported format
-            } else {
-                return '';
-            }
-            // no key for decryption
-            if (!isset($this->keys[$keyVersion])) {
-                return '';
-            }
-            $crypt = $this->getCrypt($this->keys[$keyVersion], $cryptVersion, $initVector);
-            if (null === $crypt) {
-                return '';
-            }
-            return trim($crypt->decrypt(base64_decode((string)$data)));
+        if (!$data) {
+            return '';
         }
-        return '';
+
+        $cipherOptions = $this->extractCipherOptions($data);
+
+        // no key for decryption
+        if (!isset($this->keys[$cipherOptions['keyVersion']])) {
+            return '';
+        }
+
+        $crypt = $this->getCrypt(
+            $this->keys[$cipherOptions['keyVersion']],
+            $cipherOptions['cryptVersion'],
+            $cipherOptions['initVector']
+        );
+        if (null === $crypt) {
+            return '';
+        }
+
+        return trim($crypt->decrypt(base64_decode((string) $cipherOptions['data'])));
+    }
+
+    protected function extractCipherOptions($data)
+    {
+        $parts = explode(':', $data, 4);
+        $partsCount = count($parts);
+
+        // defaults for no key version = oldest key, no crypt version = oldest crypt
+        $keyVersion = 0;
+        $cryptVersion = self::CIPHER_BLOWFISH;
+        $initVector = false;
+
+        // specified key, specified crypt, specified iv
+        if (4 === $partsCount) {
+            list($keyVersion, $cryptVersion, $iv, $data) = $parts;
+            $initVector = $iv ? $iv : false;
+            $keyVersion = (int)$keyVersion;
+            $cryptVersion = (int)$cryptVersion;
+            // specified key, specified crypt
+        } elseif (3 === $partsCount) {
+            list($keyVersion, $cryptVersion, $data) = $parts;
+            $keyVersion = (int)$keyVersion;
+            $cryptVersion = (int)$cryptVersion;
+            // no key version = oldest key, specified crypt
+        } elseif (2 === $partsCount) {
+            list($cryptVersion, $data) = $parts;
+            $keyVersion = 0;
+            $cryptVersion = (int)$cryptVersion;
+        }
+
+        return [
+            'keyVersion' => $keyVersion,
+            'cryptVersion' => $cryptVersion,
+            'initVector' => $initVector,
+            'data' => $data,
+        ];
+    }
+
+    public function needsReencrypt($data)
+    {
+        if (!$data) {
+            return false;
+        }
+
+        $cipherOptions = $this->extractCipherOptions($data);
+
+        return ($cipherOptions['keyVersion'] !== $this->keyVersion || $cipherOptions['cryptVersion'] !== $this->cipher);
     }
 
     /**
