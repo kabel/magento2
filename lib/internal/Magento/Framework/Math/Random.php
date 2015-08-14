@@ -33,6 +33,10 @@ class Random
      */
     public function getRandomString($length, $chars = null, $strong = false)
     {
+        if (!$length) {
+            return '';
+        }
+
         if (null === $chars) {
             $chars = self::CHARS_LOWERS . self::CHARS_UPPERS . self::CHARS_DIGITS;
         }
