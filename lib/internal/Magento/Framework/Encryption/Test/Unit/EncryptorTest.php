@@ -35,6 +35,7 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
     public function testGetHashNoSalt()
     {
         $this->_randomGenerator->expects($this->never())->method('getRandomString');
+        // the password API will be skipped when no salt is requested/used
         $expected = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
         $actual = $this->_model->getHash('password');
         $this->assertEquals($expected, $actual);
@@ -43,9 +44,10 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
     public function testGetHashSpecifiedSalt()
     {
         $this->_randomGenerator->expects($this->never())->method('getRandomString');
-        $expected = '13601bda4ea78e55a07b98866d2be6be0744e3866f13c00c811cab608a28f322:salt';
+        // the password API should match the following pattern and ignore provided, invalid salt
+        $expected = '/\$2y\$10\$[\.\/0-9A-Za-z]{22}.{31}/';
         $actual = $this->_model->getHash('password', 'salt');
-        $this->assertEquals($expected, $actual);
+        $this->assertRegExp($expected, $actual);
     }
 
     public function testGetHashRandomSaltDefaultLength()
@@ -55,9 +57,10 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
             ->method('getRandomString')
             ->with(32)
             ->will($this->returnValue('-----------random_salt----------'));
-        $expected = 'a1c7fc88037b70c9be84d3ad12522c7888f647915db78f42eb572008422ba2fa:-----------random_salt----------';
+        // the password API should match the following pattern and ignore random generated salt
+        $expected = '/\$2y\$10\$[\.\/0-9A-Za-z]{22}.{31}/';
         $actual = $this->_model->getHash('password', true);
-        $this->assertEquals($expected, $actual);
+        $this->assertRegExp($expected, $actual);
     }
 
     public function testGetHashRandomSaltSpecifiedLength()
@@ -67,9 +70,10 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
             ->method('getRandomString')
             ->with(11)
             ->will($this->returnValue('random_salt'));
-        $expected = '4c5cab8dd00137d11258f8f87b93fd17bd94c5026fc52d3c5af911dd177a2611:random_salt';
+        // the password API should match the following pattern and ignore random generated salt
+        $expected = '/\$2y\$10\$[\.\/0-9A-Za-z]{22}.{31}/';
         $actual = $this->_model->getHash('password', 11);
-        $this->assertEquals($expected, $actual);
+        $this->assertRegExp($expected, $actual);
     }
 
     /**
@@ -79,19 +83,21 @@ class EncryptorTest extends \PHPUnit_Framework_TestCase
      *
      * @dataProvider validateHashDataProvider
      */
-    public function testValidateHash($password, $hash, $expected)
+    public function testValidateHash($password, $hash, $expected, $expectsNeedRehash)
     {
         $actual = $this->_model->validateHash($password, $hash);
         $this->assertEquals($expected, $actual);
+        $this->assertEquals($expectsNeedRehash, $this->_model->needsRehash($hash));
     }
 
     public function validateHashDataProvider()
     {
         return [
-            ['password', 'hash', false],
-            ['password', 'hash:salt', false],
-            ['password', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', true],
-            ['password', '67a1e09bb1f83f5007dc119c14d663aa:salt', true],
+            ['password', 'hash', false, true],
+            ['password', 'hash:salt', false, true],
+            ['password', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', true, true],
+            ['password', '67a1e09bb1f83f5007dc119c14d663aa:salt', true, true],
+            ['password', '$2y$10$bRbkme0WLMhiKW1xmtPC0OxV.q0EbF0JghOETUBApr.0NOSu0d/o2', true, false]
         ];
     }
 

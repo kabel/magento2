@@ -44,6 +44,14 @@ interface EncryptorInterface
     public function validateHash($password, $hash);
 
     /**
+     * Returns if the given hash needs to be rehashed
+     *
+     * @param string $hash
+     * @return bool
+     */
+    public function needsRehash($hash);
+
+    /**
      * Encrypt a string
      *
      * @param string $data

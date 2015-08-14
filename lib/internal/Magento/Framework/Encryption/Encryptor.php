@@ -25,7 +25,13 @@ class Encryptor implements EncryptorInterface
 
     const HASH_VERSION_SHA256 = 1;
 
-    const HASH_VERSION_LATEST = 1;
+    const HASH_VERSION_PASSWORD_API = 2;
+
+    const HASH_VERSION_LATEST = 2;
+
+    const HASH_PASSWORD_API_ALGO = PASSWORD_BCRYPT;
+
+    const HASH_PASSWORD_API_COST = 10;
 
     const CIPHER_BLOWFISH = 0;
 
@@ -118,16 +124,36 @@ class Encryptor implements EncryptorInterface
      */
     public function getHash($password, $salt = false)
     {
+        $version = self::HASH_VERSION_LATEST;
+
         if ($salt === false) {
-            return $this->hash($password);
-        }
-        if ($salt === true) {
+            // the password API returns non-hex values and should only be used with salt
+            if ($version === self::HASH_VERSION_PASSWORD_API) {
+                $version = self::HASH_VERSION_SHA256;
+            }
+
+            return $this->hash($password, $version);
+        } elseif ($salt === true) {
             $salt = self::DEFAULT_SALT_LENGTH;
         }
+
         if (is_integer($salt)) {
-            $salt = $this->randomGenerator->getRandomString($salt);
+            $salt = $this->randomGenerator->getRandomString($salt, null, true);
         }
-        return $this->hash($salt . $password) . ':' . $salt;
+
+        // The password API should always generate its own salted hash
+        if ($version === self::HASH_VERSION_PASSWORD_API) {
+            $hash = $this->hash($password, $version);
+
+            // if the password API fails, generate a backwards compatible hash
+            if ($hash === false) {
+                $version = self::HASH_VERSION_SHA256;
+            } else {
+                return $hash;
+            }
+        }
+
+        return $this->hash($salt . $password, $version) . ':' . $salt;
     }
 
     /**
@@ -139,10 +165,16 @@ class Encryptor implements EncryptorInterface
      */
     public function hash($data, $version = self::HASH_VERSION_LATEST)
     {
-        if (self::HASH_VERSION_MD5 === $version) {
-            return md5($data);
+        switch ($version) {
+            case self::HASH_VERSION_PASSWORD_API:
+                return password_hash($data, self::HASH_PASSWORD_API_ALGO, ['cost' => self::HASH_PASSWORD_API_COST]);
+            case self::HASH_VERSION_SHA256:
+                return hash('sha256', $data);
+            case self::HASH_VERSION_MD5:
+                return md5($data);
         }
-        return hash('sha256', $data);
+
+        return $data;
     }
 
     /**
@@ -154,15 +186,8 @@ class Encryptor implements EncryptorInterface
      */
     public function validateHash($password, $hash)
     {
-        return $this->validateHashByVersion(
-            $password,
-            $hash,
-            self::HASH_VERSION_SHA256
-        ) || $this->validateHashByVersion(
-            $password,
-            $hash,
-            self::HASH_VERSION_MD5
-        );
+        $hashOptions = $this->extractHashOptions($hash);
+        return $this->validateHashByVersion($password, $hash, $hashOptions['version']);
     }
 
     /**
@@ -173,16 +198,69 @@ class Encryptor implements EncryptorInterface
      * @param int $version
      * @return bool
      */
-    public function validateHashByVersion($password, $hash, $version = self::HASH_VERSION_LATEST)
+    protected function validateHashByVersion($password, $hash, $version = self::HASH_VERSION_LATEST)
     {
+        $hashOptions = $this->extractHashOptions($hash);
+
+        if ($hashOptions['version'] !== $version) {
+            return false;
+        }
+
+        if ($version === self::HASH_VERSION_PASSWORD_API) {
+            return password_verify($password, $hash);
+        }
+
+        if (isset($hashOptions['saltedHash'])) {
+            return Security::compareStrings($this->hash($hashOptions['salt'] . $password, $version), $hashOptions['saltedHash']);
+        }
+
+        return Security::compareStrings($this->hash($password, $version), $hash);
+    }
+
+    public function needsRehash($hash)
+    {
+        $hashOptions = $this->extractHashOptions($hash);
+
+        if ($hashOptions['version'] !== self::HASH_VERSION_LATEST) {
+            return true;
+        }
+
+        if ($hashOptions['version'] === self::HASH_VERSION_PASSWORD_API) {
+            return password_needs_rehash($hash, self::HASH_PASSWORD_API_ALGO, ['cost' => self::HASH_PASSWORD_API_COST]);
+        }
+
+        return false;
+    }
+
+    protected function extractHashOptions($hash)
+    {
+        $options = [];
+
+        // check for the password API bcrypt prefix
+        if (substr($hash, 0, 4) === '$2y$') {
+            $options['version'] = self::HASH_VERSION_PASSWORD_API;
+            $options['algo'] = PASSWORD_BCRYPT;
+            return $options;
+        }
+
         // look for salt
         $hashArr = explode(':', $hash, 2);
-        if (1 === count($hashArr)) {
-            return Security::compareStrings($this->hash($password, $version), $hash);
-        }
-        list($hash, $salt) = $hashArr;
 
-        return Security::compareStrings($this->hash($salt . $password, $version), $hash);
+        if (2 === count($hashArr)) {
+            list($hash, $salt) = $hashArr;
+            $options['salt'] = $salt;
+            $options['saltedHash'] = $hash;
+        }
+
+        unset($hashArr);
+
+        if (strlen($hash) === 32) {
+            $options['version'] = self::HASH_VERSION_MD5;
+        } else {
+            $options['version'] = self::HASH_VERSION_SHA256;
+        }
+
+        return $options;
     }
 
     /**
